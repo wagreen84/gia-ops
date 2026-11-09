@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agency operations</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    :root { color-scheme: light dark; --bg:#0b1220; --panel:#121a2b; --fg:#e8eef8; --muted:#94a3b8; --line:#243044; --accent:#3b82f6; --warn:#f59e0b; --danger:#ef4444; --ok:#22c55e; }
+    @media (prefers-color-scheme: light) {
+      :root { --bg:#eef2f7; --panel:#fff; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); }
+    header, main, footer { max-width:1100px; margin:0 auto; padding:1.25rem 1.25rem; }
+    h1 { margin:0; font-size:1.45rem; }
+    .sub { color:var(--muted); margin:.4rem 0 0; }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.65rem; margin:1rem 0; }
+    .metric { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:.8rem; }
+    .metric .n { font-size:1.35rem; font-weight:700; }
+    .metric .l { color:var(--muted); font-size:.8rem; }
+    .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin:0 0 1rem; }
+    .tab { border:1px solid var(--line); background:var(--panel); color:inherit; border-radius:999px; padding:.4rem .85rem; cursor:pointer; }
+    .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:1rem; margin:0 0 .7rem; }
+    .top { display:flex; justify-content:space-between; gap:.75rem; align-items:flex-start; }
+    .card h2 { margin:0; font-size:1.02rem; }
+    .pill { font-size:.75rem; font-weight:650; border-radius:999px; padding:.2rem .55rem; border:1px solid var(--line); white-space:nowrap; }
+    .pill.warning { color:#fbbf24; border-color:#a16207; }
+    .pill.danger { color:#fca5a5; border-color:#b91c1c; }
+    .pill.success { color:#86efac; border-color:#15803d; }
+    .meta { color:var(--muted); font-size:.88rem; margin:.4rem 0; }
+    .note { color:var(--muted); font-size:.92rem; white-space:pre-wrap; }
+    .respond {
+      display:inline-block; margin-top:.75rem; background:var(--accent); color:#fff; text-decoration:none;
+      font-weight:650; border-radius:10px; padding:.55rem .9rem;
+    }
+    .respond:hover { filter:brightness(1.08); }
+    .callout { background:rgba(59,130,246,.12); border:1px solid var(--line); border-radius:12px; padding:.85rem 1rem; margin:1rem 0; color:var(--muted); font-size:.92rem; }
+    footer { color:var(--muted); font-size:.85rem; padding-bottom:2.5rem; }
+    .empty { color:var(--muted); padding:1.5rem; text-align:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Agency operations</h1>
+    <p class="sub" id="sub">Loading…</p>
+  </header>
+  <main>
+    <div class="callout">
+      Filter by bucket, then tap <strong>Respond</strong> to open that owner’s Grok Bot chat and reply there.
+      Board responses on a webpage are not used for send/spend approvals — say yes in the bot chat.
+      <code>grokbot://</code> links need the Grok Bot app on your device.
+    </div>
+    <div class="metrics" id="metrics"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="list"></div>
+  </main>
+  <footer id="foot"></footer>
+  <script>
+    let DATA = null;
+    let view = 'all';
+    const BUCKETS = [
+      { id:'all', label:'Everything' },
+      { id:'due', label:'Due soon' },
+      { id:'waiting', label:'Waiting on you' },
+      { id:'inflight', label:'In progress' },
+      { id:'completed', label:'Completed' },
+      { id:'later', label:'Later' },
+    ];
+    const esc = (s) => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    function filtered() {
+      if (view === 'all') return DATA.items;
+      return DATA.items.filter(i => i.bucket === view);
+    }
+    function render() {
+      const c = DATA.counts || {};
+      document.getElementById('sub').textContent = (DATA.summary || '') + ' · Last updated ' + (DATA.updated_et || '');
+      document.getElementById('metrics').innerHTML = [
+        ['Due', c.due||0],['Waiting', c.waiting||0],['In progress', c.inflight||0],['Completed', c.completed||0],['Later', c.later||0],['Total', DATA.items.length]
+      ].map(([l,n]) => `<div class="metric"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
+      const counts = Object.fromEntries(BUCKETS.map(b => [b.id, b.id==='all' ? DATA.items.length : (c[b.id]||0)]));
+      document.getElementById('tabs').innerHTML = BUCKETS.map(b =>
+        `<button type="button" class="tab${view===b.id?' active':''}" data-b="${b.id}">${esc(b.label)} (${counts[b.id]})</button>`
+      ).join('');
+      document.getElementById('tabs').onclick = (e) => {
+        const btn = e.target.closest('[data-b]'); if (!btn) return; view = btn.dataset.b; render();
+      };
+      const list = filtered();
+      document.getElementById('list').innerHTML = list.length ? list.map(it => `
+        <article class="card">
+          <div class="top"><h2>${esc(it.title)}</h2><span class="pill ${esc(it.tone||'')}">${esc(it.status)}</span></div>
+          <div class="meta">${esc(it.owner)} · ${esc(it.bucket)}</div>
+          <div class="note">${esc(it.note)}</div>
+          <a class="respond" href="${esc(it.respond_href)}">Respond in ${esc(it.owner)} chat</a>
+        </article>`).join('') : `<div class="empty">Nothing in this view.</div>`;
+      document.getElementById('foot').textContent = 'Public static board · no client names · Last updated ' + (DATA.updated_et || '');
+    }
+    fetch('./data.json', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { DATA = d; render(); })
+      .catch(() => { document.getElementById('sub').textContent = 'Could not load data.json'; });
+  </script>
+</body>
+</html>
