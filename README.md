@@ -3,16 +3,15 @@
 Static public board for Green Insurance Agency ops items.
 
 - Live site: https://wagreen84.github.io/gia-ops/
-- Each item’s **Respond** link opens that owner bot in the Grok Bot app (`grokbot://…`).
-- No client names / PHI. No tokens or secrets in this repo.
+- Buttons per item: **Reply**, **Remind me later**, **Completed** — each opens a Grok Bot chat (`grokbot://app/v1/agent?id=…` only; no prefilled message param is documented).
+- Remind / Completed show on-page say-hints.
+- No client names / PHI. No tokens or secrets.
 - Sales TV board stays at https://wagreen84.github.io/gia-board/ (separate).
 
 ## Refresh
-
-On the Grok Bot box:
 
 ```bash
 /workspace/agency-ops-board/publish_pages.sh
 ```
 
-That regenerates `data.json` from the local board DB (PHI-scrubbed), copies into this site, commits, and pushes to `main` (GitHub Pages).
+Completed items: add the item id to `/workspace/agency-ops-board/data/pages_completed_ids.json`, then republish (or set the DB bucket to `completed`).

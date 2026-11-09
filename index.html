@@ -6,13 +6,13 @@
   <title>Agency operations</title>
   <meta name="robots" content="noindex,nofollow" />
   <style>
-    :root { color-scheme: light dark; --bg:#0b1220; --panel:#121a2b; --fg:#e8eef8; --muted:#94a3b8; --line:#243044; --accent:#3b82f6; --warn:#f59e0b; --danger:#ef4444; --ok:#22c55e; }
+    :root { color-scheme: light dark; --bg:#0b1220; --panel:#121a2b; --fg:#e8eef8; --muted:#94a3b8; --line:#243044; --accent:#3b82f6; --warn:#a16207; --ok:#15803d; }
     @media (prefers-color-scheme: light) {
       :root { --bg:#eef2f7; --panel:#fff; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0; }
     }
     * { box-sizing: border-box; }
     body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); }
-    header, main, footer { max-width:1100px; margin:0 auto; padding:1.25rem 1.25rem; }
+    header, main, footer { max-width:1100px; margin:0 auto; padding:1.25rem; }
     h1 { margin:0; font-size:1.45rem; }
     .sub { color:var(--muted); margin:.4rem 0 0; }
     .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.65rem; margin:1rem 0; }
@@ -31,11 +31,15 @@
     .pill.success { color:#86efac; border-color:#15803d; }
     .meta { color:var(--muted); font-size:.88rem; margin:.4rem 0; }
     .note { color:var(--muted); font-size:.92rem; white-space:pre-wrap; }
-    .respond {
-      display:inline-block; margin-top:.75rem; background:var(--accent); color:#fff; text-decoration:none;
-      font-weight:650; border-radius:10px; padding:.55rem .9rem;
+    .actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.85rem; align-items:flex-start; }
+    .btn {
+      display:inline-block; text-decoration:none; font-weight:650; border-radius:10px; padding:.55rem .85rem; color:#fff;
     }
-    .respond:hover { filter:brightness(1.08); }
+    .btn.reply { background:var(--accent); }
+    .btn.remind { background:var(--warn); }
+    .btn.done { background:var(--ok); }
+    .hint { flex-basis:100%; color:var(--muted); font-size:.82rem; margin-top:.15rem; }
+    .hint code { font-size:.9em; }
     .callout { background:rgba(59,130,246,.12); border:1px solid var(--line); border-radius:12px; padding:.85rem 1rem; margin:1rem 0; color:var(--muted); font-size:.92rem; }
     footer { color:var(--muted); font-size:.85rem; padding-bottom:2.5rem; }
     .empty { color:var(--muted); padding:1.5rem; text-align:center; }
@@ -48,9 +52,9 @@
   </header>
   <main>
     <div class="callout">
-      Filter by bucket, then tap <strong>Respond</strong> to open that owner’s Grok Bot chat and reply there.
-      Board responses on a webpage are not used for send/spend approvals — say yes in the bot chat.
-      <code>grokbot://</code> links need the Grok Bot app on your device.
+      <strong>Reply</strong> opens the owner bot. <strong>Remind me later</strong> opens the same chat — then say the remind hint (bot will ask how long).
+      <strong>Completed</strong> opens the CEO chat with a done hint so the board can be republished.
+      Deep links need the Grok Bot app. Send/spend approvals still happen in chat, not from this page.
     </div>
     <div class="metrics" id="metrics"></div>
     <div class="tabs" id="tabs"></div>
@@ -92,7 +96,15 @@
           <div class="top"><h2>${esc(it.title)}</h2><span class="pill ${esc(it.tone||'')}">${esc(it.status)}</span></div>
           <div class="meta">${esc(it.owner)} · ${esc(it.bucket)}</div>
           <div class="note">${esc(it.note)}</div>
-          <a class="respond" href="${esc(it.respond_href)}">Respond in ${esc(it.owner)} chat</a>
+          <div class="actions">
+            <a class="btn reply" href="${esc(it.reply_href)}">Reply</a>
+            <a class="btn remind" href="${esc(it.remind_href)}">Remind me later</a>
+            <a class="btn done" href="${esc(it.completed_href)}">Completed</a>
+            <div class="hint">
+              Remind: <code>${esc(it.remind_hint || '')}</code>
+              · Completed: <code>${esc(it.completed_hint || '')}</code>
+            </div>
+          </div>
         </article>`).join('') : `<div class="empty">Nothing in this view.</div>`;
       document.getElementById('foot').textContent = 'Public static board · no client names · Last updated ' + (DATA.updated_et || '');
     }
