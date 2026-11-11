@@ -10,8 +10,6 @@ Static public board for Green Insurance Agency ops items.
 
 ## Refresh
 
-```bash
-/workspace/agency-ops-board/publish_pages.sh
-```
+From the agency-ops-board project, run `publish_pages.sh`.
 
-Completed items: add the item id to `/workspace/agency-ops-board/data/pages_completed_ids.json`, then republish (or set the DB bucket to `completed`).
+Completed items: add the item id to `data/pages_completed_ids.json`, then republish (or set the DB bucket to `completed`).

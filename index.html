@@ -12,16 +12,11 @@
     }
     * { box-sizing: border-box; }
     body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); }
-    header, main, footer { max-width:1100px; margin:0 auto; padding:1.25rem; }
+    header, main, footer { max-width:800px; margin:0 auto; padding:1.25rem; }
     h1 { margin:0; font-size:1.45rem; }
     .sub { color:var(--muted); margin:.4rem 0 0; }
-    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.65rem; margin:1rem 0; }
-    .metric { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:.8rem; }
-    .metric .n { font-size:1.35rem; font-weight:700; }
-    .metric .l { color:var(--muted); font-size:.8rem; }
-    .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin:0 0 1rem; }
-    .tab { border:1px solid var(--line); background:var(--panel); color:inherit; border-radius:999px; padding:.4rem .85rem; cursor:pointer; }
-    .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .countline { color:var(--muted); font-size:.92rem; margin:1rem 0 .75rem; }
+    .section-label { font-size:.8rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin:0 0 .65rem; }
     .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:1rem; margin:0 0 .7rem; }
     .top { display:flex; justify-content:space-between; gap:.75rem; align-items:flex-start; }
     .card h2 { margin:0; font-size:1.02rem; }
@@ -43,6 +38,17 @@
     .callout { background:rgba(59,130,246,.12); border:1px solid var(--line); border-radius:12px; padding:.85rem 1rem; margin:1rem 0; color:var(--muted); font-size:.92rem; }
     footer { color:var(--muted); font-size:.85rem; padding-bottom:2.5rem; }
     .empty { color:var(--muted); padding:1.5rem; text-align:center; }
+    details.rest { margin:1.25rem 0 0; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
+    details.rest > summary {
+      cursor:pointer; list-style:none; padding:1rem 1.1rem; font-weight:650; display:flex; justify-content:space-between; gap:.75rem; align-items:center;
+    }
+    details.rest > summary::-webkit-details-marker { display:none; }
+    details.rest > summary .chev { color:var(--muted); font-weight:500; }
+    details.rest[open] > summary { border-bottom:1px solid var(--line); }
+    .rest-body { padding:1rem; }
+    .rest-filters { display:flex; flex-wrap:wrap; gap:.4rem; margin:0 0 .85rem; }
+    .tab { border:1px solid var(--line); background:transparent; color:inherit; border-radius:999px; padding:.35rem .75rem; cursor:pointer; font:inherit; font-size:.88rem; }
+    .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
   </style>
 </head>
 <body>
@@ -52,49 +58,81 @@
   </header>
   <main>
     <div class="callout">
-      <strong>Reply</strong> opens the owner bot. <strong>Remind me later</strong> opens the same chat — then say the remind hint (bot will ask how long).
+      Only decisions that need you are listed up front — spend, sending as you, legal or compliance, hiring or firing, and irreversible calls. Everything else is folded away.
+      <strong>Reply</strong> opens the owner bot. <strong>Remind me later</strong> opens the same chat — then say the remind hint.
       <strong>Completed</strong> opens the CEO chat with a done hint so the board can be republished.
-      Deep links need the Grok Bot app. Send/spend approvals still happen in chat, not from this page.
+      Send/spend approvals still happen in chat, not from this page.
     </div>
-    <div class="metrics" id="metrics"></div>
-    <div class="tabs" id="tabs"></div>
-    <div id="list"></div>
+    <p class="countline" id="countline"></p>
+    <div id="top-wrap">
+      <div class="section-label">Needs your decision</div>
+      <div id="top"></div>
+    </div>
+    <details class="rest" id="rest">
+      <summary>
+        <span id="rest-label">Everything else (bots handling)</span>
+        <span class="chev" id="rest-chev">Show</span>
+      </summary>
+      <div class="rest-body">
+        <div class="rest-filters" id="tabs"></div>
+        <div id="list"></div>
+      </div>
+    </details>
   </main>
   <footer id="foot"></footer>
   <script>
     let DATA = null;
     let view = 'all';
+    const CAP = 5;
+    const FALLBACK_URGENCY = {
+      "form-5500-dfvc": 1,
+      "passwords-in-slack": 2,
+      "aca-premium-question": 3,
+      "soa-nov12": 4,
+      "new-era-docusign": 5,
+      "viktor-setup-email": 6,
+      "ifp-vs-medigap-hold": 7,
+      "aca-first-payment-reminder": 8,
+      "va-handoffs-cards": 9,
+      "queued-money-decisions": 10,
+      "profit-first-accounts": 11,
+    };
     const BUCKETS = [
-      { id:'all', label:'Everything' },
+      { id:'all', label:'All' },
       { id:'due', label:'Due soon' },
-      { id:'waiting', label:'Waiting on you' },
+      { id:'waiting', label:'Waiting' },
       { id:'inflight', label:'In progress' },
       { id:'completed', label:'Completed' },
       { id:'later', label:'Later' },
     ];
     const esc = (s) => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-    function filtered() {
-      if (view === 'all') return DATA.items;
-      return DATA.items.filter(i => i.bucket === view);
+    function urgencyOf(it) {
+      if (typeof it.urgency === 'number') return it.urgency;
+      return FALLBACK_URGENCY[it.id] || 99;
     }
-    function render() {
-      const c = DATA.counts || {};
-      document.getElementById('sub').textContent = (DATA.summary || '') + ' · Last updated ' + (DATA.updated_et || '');
-      document.getElementById('metrics').innerHTML = [
-        ['Due', c.due||0],['Waiting', c.waiting||0],['In progress', c.inflight||0],['Completed', c.completed||0],['Later', c.later||0],['Total', DATA.items.length]
-      ].map(([l,n]) => `<div class="metric"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
-      const counts = Object.fromEntries(BUCKETS.map(b => [b.id, b.id==='all' ? DATA.items.length : (c[b.id]||0)]));
-      document.getElementById('tabs').innerHTML = BUCKETS.map(b =>
-        `<button type="button" class="tab${view===b.id?' active':''}" data-b="${b.id}">${esc(b.label)} (${counts[b.id]})</button>`
-      ).join('');
-      document.getElementById('tabs').onclick = (e) => {
-        const btn = e.target.closest('[data-b]'); if (!btn) return; view = btn.dataset.b; render();
-      };
-      const list = filtered();
-      document.getElementById('list').innerHTML = list.length ? list.map(it => `
+    function needsYou(it) {
+      if (typeof it.needs_you === 'boolean') return it.needs_you;
+      return Object.prototype.hasOwnProperty.call(FALLBACK_URGENCY, it.id);
+    }
+    function topItems() {
+      return DATA.items
+        .filter(needsYou)
+        .slice()
+        .sort((a, b) => urgencyOf(a) - urgencyOf(b) || String(a.title).localeCompare(String(b.title)))
+        .slice(0, DATA.needs_you_cap || CAP);
+    }
+    function restItems(top) {
+      const ids = new Set(top.map(i => i.id));
+      const rest = DATA.items.filter(i => !ids.has(i.id));
+      if (view === 'all') return rest;
+      return rest.filter(i => i.bucket === view);
+    }
+    function card(it, showKind) {
+      const kind = showKind && it.decision_kind ? ` · ${esc(it.decision_kind)}` : '';
+      return `
         <article class="card">
           <div class="top"><h2>${esc(it.title)}</h2><span class="pill ${esc(it.tone||'')}">${esc(it.status)}</span></div>
-          <div class="meta">${esc(it.owner)} · ${esc(it.bucket)}</div>
+          <div class="meta">${esc(it.owner)} · ${esc(it.bucket)}${kind}</div>
           <div class="note">${esc(it.note)}</div>
           <div class="actions">
             <a class="btn reply" href="${esc(it.reply_href)}">Reply</a>
@@ -105,9 +143,33 @@
               · Completed: <code>${esc(it.completed_hint || '')}</code>
             </div>
           </div>
-        </article>`).join('') : `<div class="empty">Nothing in this view.</div>`;
+        </article>`;
+    }
+    function render() {
+      const top = topItems();
+      const restAll = DATA.items.filter(i => !new Set(top.map(t => t.id)).has(i.id));
+      const rest = restItems(top);
+      const c = DATA.counts || {};
+      document.getElementById('sub').textContent = (DATA.summary || '') + ' · Last updated ' + (DATA.updated_et || '');
+      document.getElementById('countline').textContent =
+        top.length + ' need you at the top · ' + restAll.length + ' in Everything else (bots handling)';
+      document.getElementById('top').innerHTML = top.length
+        ? top.map(it => card(it, true)).join('')
+        : `<div class="empty">Nothing needs your decision right now.</div>`;
+      document.getElementById('rest-label').textContent = 'Everything else (bots handling) (' + restAll.length + ')';
+      const counts = Object.fromEntries(BUCKETS.map(b => [b.id, b.id==='all' ? restAll.length : restAll.filter(i => i.bucket === b.id).length]));
+      document.getElementById('tabs').innerHTML = BUCKETS.map(b =>
+        `<button type="button" class="tab${view===b.id?' active':''}" data-b="${b.id}">${esc(b.label)} (${counts[b.id]})</button>`
+      ).join('');
+      document.getElementById('list').innerHTML = rest.length ? rest.map(it => card(it, false)).join('') : `<div class="empty">Nothing in this view.</div>`;
       document.getElementById('foot').textContent = 'Public static board · no client names · Last updated ' + (DATA.updated_et || '');
     }
+    document.getElementById('tabs').onclick = (e) => {
+      const btn = e.target.closest('[data-b]'); if (!btn) return; view = btn.dataset.b; render();
+    };
+    document.getElementById('rest').addEventListener('toggle', (e) => {
+      document.getElementById('rest-chev').textContent = e.currentTarget.open ? 'Hide' : 'Show';
+    });
     fetch('./data.json', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { DATA = d; render(); })
